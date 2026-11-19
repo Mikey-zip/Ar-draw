@@ -22,7 +22,11 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 button,.fb{background:rgba(255,255,255,.15);color:var(--fg);border:0;border-radius:10px;padding:10px 14px;font-size:15px;cursor:pointer}
 .fb{background:var(--accent);color:#fff}
 button.on{background:var(--accent)}
-#file{display:none}
+#file,#file2{display:none}
+#panel{display:flex;flex-direction:column;gap:10px}
+#tog{align-self:center;background:var(--bar);padding:6px 18px;font-size:14px;margin-top:-4px}
+#bar.min{background:transparent;backdrop-filter:none;padding-top:0}
+#bar.min #panel{display:none}
 #start{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;z-index:5}
 #start h1{margin:0;font-size:28px}
 #start p{margin:0;max-width:320px;opacity:.8;line-height:1.5}
@@ -34,6 +38,8 @@ button.on{background:var(--accent)}
 <video id="v" playsinline muted></video>
 <div id="stage"><img id="img" alt=""></div>
 <div id="bar" hidden>
+  <button id="tog" type="button" aria-expanded="true">▼ Einstellungen</button>
+  <div id="panel">
   <div class="row"><label for="sz">Größe</label><input id="sz" type="range" min="10" max="400" value="100"><output id="szo">100%</output></div>
   <div class="row"><label for="op">Deckkraft</label><input id="op" type="range" min="5" max="100" value="50"><output id="opo">50%</output></div>
   <div class="btns">
@@ -45,6 +51,7 @@ button.on{background:var(--accent)}
     <button id="reset" type="button">Zurücksetzen</button>
     <input id="file" type="file" accept="image/*">
     <input id="file2" type="file" accept="image/*" capture="environment">
+  </div>
   </div>
 </div>
 <div id="start">
@@ -75,6 +82,7 @@ function load(e){
   r.readAsDataURL(f);e.target.value='';
 }
 $('file').onchange=load;$('file2').onchange=load;
+$('tog').onclick=()=>{const m=$('bar').classList.toggle('min');$('tog').textContent=m?'▲ Einstellungen':'▼ Einstellungen';$('tog').setAttribute('aria-expanded',!m)};
 $('gal').onclick=()=>$('file').click();
 $('cam').onclick=()=>$('file2').click();
 $('mir').onclick=()=>{S.mirror=!S.mirror;apply()};
