@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AR Zeichnen</title>
+<style>
+:root{--bg:#111;--fg:#fff;--bar:rgba(20,20,20,.78);--accent:#7c5cff;box-sizing:border-box}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#111;--fg:#fff;--bar:rgba(20,20,20,.78)}}
+:root[data-theme="dark"]{--bg:#111;--fg:#fff;--bar:rgba(20,20,20,.78)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#v{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
+#stage{position:fixed;inset:0;overflow:hidden}
+#img{position:absolute;left:50%;top:50%;max-width:80vw;max-height:60vh;transform-origin:center;pointer-events:none;display:none}
+#bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bar);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:10px}
+.row label{width:76px;font-size:14px}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row output{width:46px;text-align:right;font-size:13px;opacity:.8}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button,.fb{background:rgba(255,255,255,.15);color:var(--fg);border:0;border-radius:10px;padding:10px 14px;font-size:15px;cursor:pointer}
+.fb{background:var(--accent);color:#fff}
+button.on{background:var(--accent)}
+#file{display:none}
+#start{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;z-index:5}
+#start h1{margin:0;font-size:28px}
+#start p{margin:0;max-width:320px;opacity:.8;line-height:1.5}
+#go{background:var(--accent);color:#fff;border:0;border-radius:14px;padding:14px 28px;font-size:18px}
+#msg{font-size:13px;opacity:.7}
+</style>
+</head>
+<body>
+<video id="v" playsinline muted></video>
+<div id="stage"><img id="img" alt=""></div>
+<div id="bar" hidden>
+  <div class="row"><label for="sz">Größe</label><input id="sz" type="range" min="10" max="400" value="100"><output id="szo">100%</output></div>
+  <div class="row"><label for="op">Deckkraft</label><input id="op" type="range" min="5" max="100" value="50"><output id="opo">50%</output></div>
+  <div class="btns">
+    <label class="fb" for="file">Foto wählen</label>
+    <input id="file" type="file" accept="image/*">
+    <button id="lock">Sperren</button>
+    <button id="reset">Zurücksetzen</button>
+  </div>
+</div>
+<div id="start">
+  <h1>AR Zeichnen</h1>
+  <p>Starte die Kamera, wähle ein Foto aus deiner Galerie und lege es als Vorlage über das Kamerabild. Größe und Deckkraft stellst du selbst ein.</p>
+  <button id="go">Kamera starten</button>
+  <div id="msg"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const v=$('v'),img=$('img'),stage=$('stage');
+let S={x:0,y:0,scale:1,rot:0,locked:false};
+function apply(){
+  img.style.transform=`translate(-50%,-50%) translate(${S.x}px,${S.y}px) rotate(${S.rot}rad) scale(${S.scale})`;
+  img.style.opacity=$('op').value/100;
+  $('sz').value=Math.round(S.scale*100);
+  $('szo').textContent=Math.round(S.scale*100)+'%';
+  $('opo').textContent=$('op').value+'%';
+}
+$('sz').oninput=e=>{S.scale=e.target.value/100;apply()};
+$('op').oninput=apply;
+$('reset').onclick=()=>{S={x:0,y:0,scale:1,rot:0,locked:S.locked};$('op').value=50;apply()};
+$('lock').onclick=e=>{S.locked=!S.locked;e.target.classList.toggle('on',S.locked);e.target.textContent=S.locked?'Gesperrt':'Sperren'};
+$('file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{img.src=r.result;img.style.display='block';S={x:0,y:0,scale:1,rot:0,locked:S.locked};apply()};
+  r.readAsDataURL(f);
+};
+// Gesten: 1 Finger = verschieben, 2 Finger = zoomen + drehen
+const P=new Map();let g=null;
+function two(){const p=[...P.values()];return{d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),a:Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x)}}
+stage.addEventListener('pointerdown',e=>{
+  if(S.locked||img.style.display==='none')return;
+  stage.setPointerCapture(e.pointerId);P.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  g=P.size===2?{...two(),s:S.scale,r:S.rot}:null;
+});
+stage.addEventListener('pointermove',e=>{
+  if(!P.has(e.pointerId))return;
+  const o=P.get(e.pointerId),n={x:e.clientX,y:e.clientY};
+  if(P.size===1){S.x+=n.x-o.x;S.y+=n.y-o.y}
+  P.set(e.pointerId,n);
+  if(P.size===2&&g){const t=two();S.scale=Math.min(4,Math.max(.1,g.s*t.d/g.d));S.rot=g.r+(t.a-g.a)}
+  apply();
+});
+['pointerup','pointercancel'].forEach(t=>stage.addEventListener(t,e=>{P.delete(e.pointerId);g=null}));
+
+$('go').onclick=async()=>{
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    v.srcObject=s;await v.play();
+  }catch(_){$('msg').textContent='Kamera nicht verfügbar. Erlaube den Kamerazugriff oder öffne den Link direkt im Browser.';await new Promise(r=>setTimeout(r,2200))}
+  $('start').hidden=true;$('bar').hidden=false;apply();
+};
+</script>
+</body>
+</html>
